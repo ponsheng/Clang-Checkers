@@ -4,15 +4,21 @@
 #include "clang/Frontend/FrontendAction.h"
 #include "clang/Tooling/Tooling.h"
 
+#include "clang/Lex/LiteralSupport.h"
+
 
 using namespace clang;
 
+namespace test {
+
 static void pLoc(FullSourceLoc& Loc,const char* msg) {
-  llvm::outs() << msg
+  llvm::outs() << msg << "  "
                      << Loc.getSpellingLineNumber() << ":"
                      << Loc.getSpellingColumnNumber() << "\n";
 //  Loc.dump();
 }
+
+
 
 
 class FindNamedClassVisitor
@@ -21,36 +27,81 @@ public:
   explicit FindNamedClassVisitor(ASTContext *Context)
     : Context(Context) {}
 
-/*  bool VisitCXXRecordDecl(CXXRecordDecl *Declaration) {
-    Declaration->dump();
-    if (Declaration->getQualifiedNameAsString() == "n::m::C") {
-      FullSourceLoc FullLocation = Context->getFullLoc(Declaration->getLocStart());
-      if (FullLocation.isValid())
-        llvm::outs() << "Found declaration at "
-                     << FullLocation.getSpellingLineNumber() << ":"
-                     << FullLocation.getSpellingColumnNumber() << "\n";
-    }
 
-    return true;
-  }*/
-  // Find sizeof
-  bool VisitUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr *Expr) {
-    if (Expr->getKind() != UETT_SizeOf) {
+  //R12_5:  The sizeof operator shall not have an operand which is a function parameter declared as “array of type”
+  bool VisitUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr *expr) {
+
+    // Only Sizeof operator
+    if (expr->getKind() != UETT_SizeOf) {
 	  return false;
 	}
-//    if (Declaration->getQualifiedNameAsString() == "n::m::C") {
-      FullSourceLoc FullLocation = Context->getFullLoc(Expr->getLocStart());
-      if (FullLocation.isValid()) {
-		pLoc(FullLocation,"Found sizeof at ");
-      }
+    // Except sizeof(type)
+    // Wipe out type is argument
+    if (expr->isArgumentType() != false) {
+      return false;
+    }
 
-    Expr->dumpColor();
-    //}
+    //expr->dumpColor();
+    //
+    Expr* arg = expr->getArgumentExpr();
+
+		// Copy from clang/lib/Sema/SemaExpr.cpp
+		if (DeclRefExpr *DeclRef = dyn_cast<DeclRefExpr>(arg->IgnoreParens())) {
+			if (ParmVarDecl *PVD = dyn_cast<ParmVarDecl>(DeclRef->getFoundDecl())) {
+				QualType OType = PVD->getOriginalType();
+				QualType Type = PVD->getType();
+				if (Type->isPointerType() && OType->isArrayType()) {
+
+          FullSourceLoc FullLocation = Context->getFullLoc(DeclRef->getLocStart());
+          if (FullLocation.isValid()) {
+		        pLoc(FullLocation,"Using sizeof on function parameter!");
+				  }
+        }
+			}
+		}
+
     return true;
   }
 
+
+
+	// R7_2 A "u" or "U" suffix shall be applied to all integer constants that are represented in an unsigned type
+	bool VisitIntegerLiteral(IntegerLiteral *il) {
+//		il->dumpColor();
+
+    using std::string;
+    const SourceManager &sm = Context->getSourceManager();
+    const SourceLocation spellingLoc = sm.getSpellingLoc(il->getLocStart());
+    const string lexem = srcLocToString(spellingLoc);
+//    const NumericLiteralParser nlp(lexem, spellingLoc, CI->getPreprocessor());
+
+//		llvm::outs() << lexem << "\n";
+
+    /* if ((nlp.isUnsigned && lexem.find("u") != string::npos) ||
+        (nlp.isFloat && lexem.find("f") != string::npos) ||
+        ((nlp.isLong || nlp.isLongLong) && lexem.find("l") != string::npos)) {
+      reportError(expr->getLocEnd());
+    }
+*/
+    return true;
+  }
+
+
 private:
   ASTContext *Context;
+
+std::string srcLocToString(const SourceLocation start) {
+  const clang::SourceManager &sm = Context->getSourceManager();
+  const clang::LangOptions lopt = Context->getLangOpts();
+  const SourceLocation spellingLoc = sm.getSpellingLoc(start);
+  unsigned tokenLength =
+      clang::Lexer::MeasureTokenLength(spellingLoc, sm, lopt);
+  return std::string(sm.getCharacterData(spellingLoc),
+                     sm.getCharacterData(spellingLoc) + tokenLength);
+}
+
+
+
 };
 
 class FindNamedClassConsumer : public clang::ASTConsumer {
@@ -74,8 +125,12 @@ public:
   }
 };
 
+} // end of namespace test
+
 int main(int argc, char **argv) {
   if (argc > 1) {
-    clang::tooling::runToolOnCode(new FindNamedClassAction, argv[1]);
+    clang::tooling::runToolOnCode(new test::FindNamedClassAction, argv[1]);
   }
+  return 0;
 }
+
