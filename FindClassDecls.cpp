@@ -41,12 +41,12 @@ public:
 
     // Only Sizeof operator
     if (expr->getKind() != UETT_SizeOf) {
-      return false;
+      return true;
     }
     // Except sizeof(type)
     // Wipe out type is argument
     if (expr->isArgumentType() != false) {
-      return false;
+      return true;
     }
 
     // expr->dumpColor();
@@ -90,6 +90,18 @@ public:
 */
     return true;
   }
+
+  // R12_3:  The comma operator should not be used
+  bool VisitBinaryOperator(BinaryOperator *bo) {
+
+    if (bo->getOpcode() !=  BO_Comma) {
+      return true;
+    }
+    bo->dumpColor();
+    pError(Context, bo, "Using comma operator!");
+    return true;
+  }
+
 
 private:
   ASTContext *Context;
