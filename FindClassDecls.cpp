@@ -14,15 +14,20 @@ using namespace clang;
 
 namespace test {
 
-static void pLoc(FullSourceLoc& Loc,const char* msg) {
-  llvm::outs() << msg << "  "
-                     << Loc.getSpellingLineNumber() << ":"
-                     << Loc.getSpellingColumnNumber() << "\n";
+template <class T>
+static void pError(ASTContext* Context, T ASTnode,const char* msg) {
+  const SourceManager &sm = Context->getSourceManager();
+  const SourceLocation spellingLoc = sm.getSpellingLoc(ASTnode->getLocStart());
+
+	FullSourceLoc FullLocation = Context->getFullLoc(ASTnode->getLocStart());
+	if (FullLocation.isValid()) {
+  	llvm::outs() << sm.getFilename(spellingLoc) << ":"
+                 << FullLocation.getSpellingLineNumber() << ":"
+                 << FullLocation.getSpellingColumnNumber() << "  "
+								 << msg << "  " << "\n";
+	}
 //  Loc.dump();
 }
-
-
-
 
 class FindNamedClassVisitor
   : public RecursiveASTVisitor<FindNamedClassVisitor> {
@@ -37,7 +42,7 @@ public:
     // Only Sizeof operator
     if (expr->getKind() != UETT_SizeOf) {
 	  return false;
-	}
+	  }
     // Except sizeof(type)
     // Wipe out type is argument
     if (expr->isArgumentType() != false) {
@@ -55,10 +60,7 @@ public:
 				QualType Type = PVD->getType();
 				if (Type->isPointerType() && OType->isArrayType()) {
 
-          FullSourceLoc FullLocation = Context->getFullLoc(DeclRef->getLocStart());
-          if (FullLocation.isValid()) {
-		        pLoc(FullLocation,"Using sizeof on function parameter!");
-				  }
+		    	pError(Context, DeclRef,"Using sizeof on function parameter!");
         }
 			}
 		}
