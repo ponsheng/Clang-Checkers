@@ -6,6 +6,9 @@
 
 #include "clang/Lex/LiteralSupport.h"
 
+// Command line support
+#include "clang/Tooling/CommonOptionsParser.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace clang;
 
@@ -127,10 +130,24 @@ public:
 
 } // end of namespace test
 
-int main(int argc, char **argv) {
-  if (argc > 1) {
+
+// Handling input
+
+static llvm::cl::OptionCategory MyToolCategory("my-tool options");
+static llvm::cl::extrahelp CommonHelp(tooling::CommonOptionsParser::HelpMessage);
+
+int main(int argc,const char **argv) {
+  tooling::CommonOptionsParser OptionsParser(argc, argv, MyToolCategory);
+
+  tooling::ClangTool Tool(OptionsParser.getCompilations(),
+                       OptionsParser.getSourcePathList());
+  return Tool.run(tooling::newFrontendActionFactory<test::FindNamedClassAction >().get());
+
+  /*  if (argc > 1) {
     clang::tooling::runToolOnCode(new test::FindNamedClassAction, argv[1]);
   }
+*/
+
   return 0;
 }
 
