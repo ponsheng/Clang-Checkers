@@ -15,72 +15,72 @@ using namespace clang;
 namespace test {
 
 template <class T>
-static void pError(ASTContext* Context, T ASTnode,const char* msg) {
+static void pError(ASTContext *Context, T ASTnode, const char *msg) {
   const SourceManager &sm = Context->getSourceManager();
   const SourceLocation spellingLoc = sm.getSpellingLoc(ASTnode->getLocStart());
 
-	FullSourceLoc FullLocation = Context->getFullLoc(ASTnode->getLocStart());
-	if (FullLocation.isValid()) {
-  	llvm::outs() << sm.getFilename(spellingLoc) << ":"
+  FullSourceLoc FullLocation = Context->getFullLoc(ASTnode->getLocStart());
+  if (FullLocation.isValid()) {
+    llvm::outs() << sm.getFilename(spellingLoc) << ":"
                  << FullLocation.getSpellingLineNumber() << ":"
-                 << FullLocation.getSpellingColumnNumber() << "  "
-								 << msg << "  " << "\n";
-	}
-//  Loc.dump();
+                 << FullLocation.getSpellingColumnNumber() << "  " << msg
+                 << "  "
+                 << "\n";
+  }
+  //  Loc.dump();
 }
 
 class FindNamedClassVisitor
-  : public RecursiveASTVisitor<FindNamedClassVisitor> {
+    : public RecursiveASTVisitor<FindNamedClassVisitor> {
 public:
-  explicit FindNamedClassVisitor(ASTContext *Context)
-    : Context(Context) {}
+  explicit FindNamedClassVisitor(ASTContext *Context) : Context(Context) {}
 
-
-  //R12_5:  The sizeof operator shall not have an operand which is a function parameter declared as “array of type”
+  // R12_5:  The sizeof operator shall not have an operand which is a function
+  // parameter declared as “array of type”
   bool VisitUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr *expr) {
 
     // Only Sizeof operator
     if (expr->getKind() != UETT_SizeOf) {
-	  return false;
-	  }
+      return false;
+    }
     // Except sizeof(type)
     // Wipe out type is argument
     if (expr->isArgumentType() != false) {
       return false;
     }
 
-    //expr->dumpColor();
+    // expr->dumpColor();
     //
-    Expr* arg = expr->getArgumentExpr();
+    Expr *arg = expr->getArgumentExpr();
 
-		// Copy from clang/lib/Sema/SemaExpr.cpp
-		if (DeclRefExpr *DeclRef = dyn_cast<DeclRefExpr>(arg->IgnoreParens())) {
-			if (ParmVarDecl *PVD = dyn_cast<ParmVarDecl>(DeclRef->getFoundDecl())) {
-				QualType OType = PVD->getOriginalType();
-				QualType Type = PVD->getType();
-				if (Type->isPointerType() && OType->isArrayType()) {
+    // Copy from clang/lib/Sema/SemaExpr.cpp
+    if (DeclRefExpr *DeclRef = dyn_cast<DeclRefExpr>(arg->IgnoreParens())) {
+      if (ParmVarDecl *PVD = dyn_cast<ParmVarDecl>(DeclRef->getFoundDecl())) {
+        QualType OType = PVD->getOriginalType();
+        QualType Type = PVD->getType();
+        if (Type->isPointerType() && OType->isArrayType()) {
 
-		    	pError(Context, DeclRef,"Using sizeof on function parameter!");
+          pError(Context, DeclRef, "Using sizeof on function parameter!");
         }
-			}
-		}
+      }
+    }
 
     return true;
   }
 
-
-
-	// R7_2 A "u" or "U" suffix shall be applied to all integer constants that are represented in an unsigned type
-	bool VisitIntegerLiteral(IntegerLiteral *il) {
-//		il->dumpColor();
+  // R7_2 A "u" or "U" suffix shall be applied to all integer constants that are
+  // represented in an unsigned type
+  bool VisitIntegerLiteral(IntegerLiteral *il) {
+    //		il->dumpColor();
 
     using std::string;
     const SourceManager &sm = Context->getSourceManager();
     const SourceLocation spellingLoc = sm.getSpellingLoc(il->getLocStart());
     const string lexem = srcLocToString(spellingLoc);
-//    const NumericLiteralParser nlp(lexem, spellingLoc, CI->getPreprocessor());
+    //    const NumericLiteralParser nlp(lexem, spellingLoc,
+    //    CI->getPreprocessor());
 
-//		llvm::outs() << lexem << "\n";
+    //		llvm::outs() << lexem << "\n";
 
     /* if ((nlp.isUnsigned && lexem.find("u") != string::npos) ||
         (nlp.isFloat && lexem.find("f") != string::npos) ||
@@ -91,40 +91,36 @@ public:
     return true;
   }
 
-
 private:
   ASTContext *Context;
 
-std::string srcLocToString(const SourceLocation start) {
-  const clang::SourceManager &sm = Context->getSourceManager();
-  const clang::LangOptions lopt = Context->getLangOpts();
-  const SourceLocation spellingLoc = sm.getSpellingLoc(start);
-  unsigned tokenLength =
-      clang::Lexer::MeasureTokenLength(spellingLoc, sm, lopt);
-  return std::string(sm.getCharacterData(spellingLoc),
-                     sm.getCharacterData(spellingLoc) + tokenLength);
-}
-
-
-
+  std::string srcLocToString(const SourceLocation start) {
+    const clang::SourceManager &sm = Context->getSourceManager();
+    const clang::LangOptions lopt = Context->getLangOpts();
+    const SourceLocation spellingLoc = sm.getSpellingLoc(start);
+    unsigned tokenLength =
+        clang::Lexer::MeasureTokenLength(spellingLoc, sm, lopt);
+    return std::string(sm.getCharacterData(spellingLoc),
+                       sm.getCharacterData(spellingLoc) + tokenLength);
+  }
 };
 
 class FindNamedClassConsumer : public clang::ASTConsumer {
 public:
-  explicit FindNamedClassConsumer(ASTContext *Context)
-    : Visitor(Context) {}
+  explicit FindNamedClassConsumer(ASTContext *Context) : Visitor(Context) {}
 
   virtual void HandleTranslationUnit(clang::ASTContext &Context) {
     Visitor.TraverseDecl(Context.getTranslationUnitDecl());
   }
+
 private:
   FindNamedClassVisitor Visitor;
 };
 
 class FindNamedClassAction : public clang::ASTFrontendAction {
 public:
-  virtual std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(
-    clang::CompilerInstance &Compiler, llvm::StringRef InFile) {
+  virtual std::unique_ptr<clang::ASTConsumer>
+  CreateASTConsumer(clang::CompilerInstance &Compiler, llvm::StringRef InFile) {
     return std::unique_ptr<clang::ASTConsumer>(
         new FindNamedClassConsumer(&Compiler.getASTContext()));
   }
@@ -132,18 +128,19 @@ public:
 
 } // end of namespace test
 
-
 // Handling input
 
 static llvm::cl::OptionCategory MyToolCategory("my-tool options");
-static llvm::cl::extrahelp CommonHelp(tooling::CommonOptionsParser::HelpMessage);
+static llvm::cl::extrahelp
+    CommonHelp(tooling::CommonOptionsParser::HelpMessage);
 
-int main(int argc,const char **argv) {
+int main(int argc, const char **argv) {
   tooling::CommonOptionsParser OptionsParser(argc, argv, MyToolCategory);
 
   tooling::ClangTool Tool(OptionsParser.getCompilations(),
-                       OptionsParser.getSourcePathList());
-  return Tool.run(tooling::newFrontendActionFactory<test::FindNamedClassAction >().get());
+                          OptionsParser.getSourcePathList());
+  return Tool.run(
+      tooling::newFrontendActionFactory<test::FindNamedClassAction>().get());
 
   /*  if (argc > 1) {
     clang::tooling::runToolOnCode(new test::FindNamedClassAction, argv[1]);
@@ -152,4 +149,3 @@ int main(int argc,const char **argv) {
 
   return 0;
 }
-
