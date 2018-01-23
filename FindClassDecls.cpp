@@ -10,6 +10,9 @@
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "llvm/Support/CommandLine.h"
 
+#include <algorithm>
+#include <vector>
+
 using namespace clang;
 
 namespace test {
@@ -19,7 +22,7 @@ static void pError(ASTContext *Context, T ASTnode, const char *msg) {
   const SourceManager &sm = Context->getSourceManager();
   const SourceLocation LocStart = ASTnode->getLocStart();
   const SourceLocation SpellingLoc = sm.getSpellingLoc(ASTnode->getLocStart());
-  const SourceLocation FileLoc = sm.getFileLoc(ASTnode->getLocStart());
+  // const SourceLocation FileLoc = sm.getFileLoc(ASTnode->getLocStart());
 
   // FullSourceLoc is just combination SM & SourceLocation
   // FullSourceLoc FullLocation = Context->getFullLoc(ASTnode->getLocStart());
@@ -28,7 +31,7 @@ static void pError(ASTContext *Context, T ASTnode, const char *msg) {
     //    LocStart.dump(sm);
     SpellingLoc.dump(sm);
     //    FileLoc.dump(sm);
-    llvm::outs() << "\n";
+    llvm::outs() << " " << msg << "\n";
     /*llvm::outs() << sm.getFilename(spellingLoc) << ":"
                  << sm.getSpellingLineNumber(spellingLoc) << ":"
                  << sm.getSpellingColumnNumber(spellingLoc) << "  " << msg
@@ -51,6 +54,7 @@ class FindNamedClassVisitor
 public:
   explicit FindNamedClassVisitor(ASTContext *Context) : Context(Context) {}
 
+  /**********************************************************************************/
   // R12_5:  The sizeof operator shall not have an operand which is a function
   // parameter declared as “array of type”
   bool VisitUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr *expr) {
@@ -84,6 +88,7 @@ public:
     return true;
   }
 
+  /**********************************************************************************/
   // Code that can fetch token source code
   bool VisitIntegerLiteral(IntegerLiteral *il) {
     //		il->dumpColor();
@@ -106,6 +111,7 @@ public:
     return true;
   }
 
+  /**********************************************************************************/
   // R12_3:  The comma operator should not be used
   bool VisitBinaryOperator(BinaryOperator *bo) {
 
@@ -117,10 +123,37 @@ public:
     return true;
   }
 
-  /*  bool TraverseDecl(Decl *) {
-      llvm::outs() << "Traverse\n\n";
-        return true;
-    }*/
+  /**********************************************************************************/
+  // Rule 16_2 A switch label shall only be used when the most closely-enclosing
+  //   compound statement is the body of a switch statement
+  bool VisitSwitchStmt(SwitchStmt *ss) {
+    CompoundStmt *body = dyn_cast<CompoundStmt>(ss->getBody());
+    if (body == nullptr) {
+      return true;
+    }
+
+    std::vector<SwitchCase *> cases;
+    // Record most closely-enclosing cases
+    for (CompoundStmt::body_iterator bi = body->body_begin();
+         bi != body->body_end(); bi++) {
+      if (isa<SwitchCase>(*bi)) {
+        SwitchCase *sc = dyn_cast<SwitchCase>(*bi);
+        cases.push_back(sc);
+        //(*bi)->dumpColor();
+      }
+    }
+
+    for (const SwitchCase *sc = ss->getSwitchCaseList(); sc != nullptr;
+         sc = sc->getNextSwitchCase()) {
+      if (std::find(cases.begin(), cases.end(), sc) == cases.end()) {
+        // sc->dumpColor();
+        pError(
+            Context, sc,
+            "Switch case is not used in most closely-enclosing of switch body");
+      }
+    }
+    return true;
+  }
 
 private:
   ASTContext *Context;
