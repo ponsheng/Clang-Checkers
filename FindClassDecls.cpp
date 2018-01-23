@@ -17,17 +17,33 @@ namespace test {
 template <class T>
 static void pError(ASTContext *Context, T ASTnode, const char *msg) {
   const SourceManager &sm = Context->getSourceManager();
-  const SourceLocation spellingLoc = sm.getSpellingLoc(ASTnode->getLocStart());
+  const SourceLocation LocStart = ASTnode->getLocStart();
+  const SourceLocation SpellingLoc = sm.getSpellingLoc(ASTnode->getLocStart());
+  const SourceLocation FileLoc = sm.getFileLoc(ASTnode->getLocStart());
 
-  FullSourceLoc FullLocation = Context->getFullLoc(ASTnode->getLocStart());
-  if (FullLocation.isValid()) {
-    llvm::outs() << sm.getFilename(spellingLoc) << ":"
-                 << FullLocation.getSpellingLineNumber() << ":"
-                 << FullLocation.getSpellingColumnNumber() << "  " << msg
+  // FullSourceLoc is just combination SM & SourceLocation
+  // FullSourceLoc FullLocation = Context->getFullLoc(ASTnode->getLocStart());
+
+  if (LocStart.isValid()) {
+    //    LocStart.dump(sm);
+    SpellingLoc.dump(sm);
+    //    FileLoc.dump(sm);
+    llvm::outs() << "\n";
+    /*llvm::outs() << sm.getFilename(spellingLoc) << ":"
+                 << sm.getSpellingLineNumber(spellingLoc) << ":"
+                 << sm.getSpellingColumnNumber(spellingLoc) << "  " << msg
                  << "  "
-                 << "\n";
+                 << "\n";*/
+  } else {
+    llvm::outs() << "FullSourceLoc is not valid\n";
+    return;
   }
-  //  Loc.dump();
+
+  if (LocStart.isMacroID() == true) {
+    llvm::outs() << "Defined in Macro!!\n";
+  } else {
+    // llvm::outs() << "Not macro\n";
+  }
 }
 
 class FindNamedClassVisitor
@@ -68,8 +84,7 @@ public:
     return true;
   }
 
-  // R7_2 A "u" or "U" suffix shall be applied to all integer constants that are
-  // represented in an unsigned type
+  // Code that can fetch token source code
   bool VisitIntegerLiteral(IntegerLiteral *il) {
     //		il->dumpColor();
 
@@ -80,7 +95,7 @@ public:
     //    const NumericLiteralParser nlp(lexem, spellingLoc,
     //    CI->getPreprocessor());
 
-    //		llvm::outs() << lexem << "\n";
+    // llvm::outs() << lexem << "\n";
 
     /* if ((nlp.isUnsigned && lexem.find("u") != string::npos) ||
         (nlp.isFloat && lexem.find("f") != string::npos) ||
@@ -94,14 +109,18 @@ public:
   // R12_3:  The comma operator should not be used
   bool VisitBinaryOperator(BinaryOperator *bo) {
 
-    if (bo->getOpcode() !=  BO_Comma) {
+    if (bo->getOpcode() != BO_Comma) {
       return true;
     }
-    bo->dumpColor();
+    // bo->dumpColor();
     pError(Context, bo, "Using comma operator!");
     return true;
   }
 
+  /*  bool TraverseDecl(Decl *) {
+      llvm::outs() << "Traverse\n\n";
+        return true;
+    }*/
 
 private:
   ASTContext *Context;
