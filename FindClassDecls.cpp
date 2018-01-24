@@ -80,7 +80,8 @@ public:
         QualType Type = PVD->getType();
         if (Type->isPointerType() && OType->isArrayType()) {
 
-          pError(Context, DeclRef, "Using sizeof on function parameter!");
+          pError(Context, DeclRef,
+                 "R12_5: Using sizeof on function parameter!");
         }
       }
     }
@@ -119,7 +120,7 @@ public:
       return true;
     }
     // bo->dumpColor();
-    pError(Context, bo, "Using comma operator!");
+    pError(Context, bo, "R12_3: Using comma operator!");
     return true;
   }
 
@@ -160,10 +161,24 @@ public:
          sc = sc->getNextSwitchCase()) {
       if (std::find(cases.begin(), cases.end(), sc) == cases.end()) {
         // sc->dumpColor();
-        pError(
-            Context, sc,
-            "Switch case is not used in most closely-enclosing of switch body");
+        pError(Context, sc,
+               "R16_2: Switch case is not used in most closely-enclosing of "
+               "switch body");
       }
+    }
+
+    /*******************************************************************************/
+    // Rule 16_4 Every switch statement shall have a default label
+    bool hasDefault = false;
+    for (const SwitchCase *sc = ss->getSwitchCaseList(); sc != nullptr;
+         sc = sc->getNextSwitchCase()) {
+      if (isa<DefaultStmt>(sc)) {
+        hasDefault = true;
+      }
+    }
+    if (!hasDefault) {
+      pError(Context, ss,
+             "R16_4 Every switch statement shall have a default label");
     }
 
     /*******************************************************************************/
@@ -188,7 +203,8 @@ public:
           } else {
             if (isa<DefaultStmt>(lastSc)) {
               pError(Context, lastSc,
-                     "A default label shall appear as either the first or the "
+                     "R16_5: A default label shall appear as either the first "
+                     "or the "
                      "last "
                      "switch label");
             }
