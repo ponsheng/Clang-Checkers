@@ -1,0 +1,8 @@
+# Get macro
+
+/lib/Frontend/DiagnosticRenderer.cpp:423:
+
+# Accelerating compile
+
+* Change ld to gold or lld
+  * lld not compilable

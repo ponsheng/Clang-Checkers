@@ -19,17 +19,10 @@ Implement checker based on Misra-C 2012
 * R12_5:  The sizeof operator shall not have an operand which is a function parameter declared as “array of type”
 
 * R16_2: A switch label shall only be used when the most closely-enclosing compound statement is the body of a switch statement
-# Accelerating compile
 
-* Change ld to gold or lld
-  * lld not compilable
+* R16_5: A default label shall appear as either the first or the last switch label of a switch statement
 
 # Reference
 
 https://github.com/rettichschnidi/clang-misracpp2008
 
-
-
-# Get macro
-
-/lib/Frontend/DiagnosticRenderer.cpp:423:

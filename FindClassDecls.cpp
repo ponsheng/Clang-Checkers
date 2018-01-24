@@ -31,7 +31,7 @@ static void pError(ASTContext *Context, T ASTnode, const char *msg) {
     //    LocStart.dump(sm);
     SpellingLoc.dump(sm);
     //    FileLoc.dump(sm);
-    llvm::outs() << " " << msg << "\n";
+    llvm::outs() << "\n - " << msg << "\n\n";
     /*llvm::outs() << sm.getFilename(spellingLoc) << ":"
                  << sm.getSpellingLineNumber(spellingLoc) << ":"
                  << sm.getSpellingColumnNumber(spellingLoc) << "  " << msg
@@ -123,11 +123,18 @@ public:
     return true;
   }
 
-  /**********************************************************************************/
+  /*********************************************************************************/
   // Rule 16_2 A switch label shall only be used when the most closely-enclosing
   //   compound statement is the body of a switch statement
+
+  // Rule 16_3 An unconditional break statement shall terminate every
+  // switch-clause
+
+  //
   bool VisitSwitchStmt(SwitchStmt *ss) {
     CompoundStmt *body = dyn_cast<CompoundStmt>(ss->getBody());
+
+    // There is always a compoundStmt even a empty switch
     if (body == nullptr) {
       return true;
     }
@@ -139,6 +146,12 @@ public:
       if (isa<SwitchCase>(*bi)) {
         SwitchCase *sc = dyn_cast<SwitchCase>(*bi);
         cases.push_back(sc);
+
+        // If continuous case: case 1: case 2: case 3:
+        while (isa<SwitchCase>(sc->getSubStmt())) {
+          sc = dyn_cast<SwitchCase>(sc->getSubStmt());
+          cases.push_back(sc);
+        }
         //(*bi)->dumpColor();
       }
     }
@@ -152,8 +165,56 @@ public:
             "Switch case is not used in most closely-enclosing of switch body");
       }
     }
+
+    /*******************************************************************************/
+    // Rule 16_5 A default label shall appear as either the first or the last
+    // switch label of a switch statement
+    //
+    // We check if any SwitchCase is default except first and end
+    {
+      int labelCount = 0;
+      SwitchCase *curSc = nullptr;
+      SwitchCase *lastSc;
+
+      for (CompoundStmt::body_iterator bi = body->body_begin();
+           bi != body->body_end(); bi++) {
+        if (isa<SwitchCase>(*bi)) {
+          lastSc = curSc;
+          curSc = dyn_cast<SwitchCase>(*bi);
+
+          /* check */
+          if (labelCount < 2) {
+            labelCount++;
+          } else {
+            if (isa<DefaultStmt>(lastSc)) {
+              pError(Context, lastSc,
+                     "A default label shall appear as either the first or the "
+                     "last "
+                     "switch label");
+            }
+          }
+
+          while (isa<SwitchCase>(curSc->getSubStmt())) {
+            lastSc = curSc;
+            curSc = dyn_cast<SwitchCase>(curSc->getSubStmt());
+
+            if (labelCount < 2) {
+              labelCount++;
+            } else {
+              if (isa<DefaultStmt>(lastSc)) {
+                pError(
+                    Context, lastSc,
+                    "A default label shall appear as either the first or the "
+                    "last switch label");
+              }
+            }
+          }
+        }
+      }
+    }
+
     return true;
-  }
+  } // end visitSwitch
 
 private:
   ASTContext *Context;
