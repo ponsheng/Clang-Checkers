@@ -204,9 +204,7 @@ public:
             if (isa<DefaultStmt>(lastSc)) {
               pError(Context, lastSc,
                      "R16_5: A default label shall appear as either the first "
-                     "or the "
-                     "last "
-                     "switch label");
+                     "or the last switch label");
             }
           }
 
@@ -227,6 +225,22 @@ public:
           }
         }
       }
+    } // end of R16_5
+
+    /*******************************************************************************/
+    // R16_6 Every switch statement shall have at least two switch-clauses
+    int labelCount = 0;
+    for (CompoundStmt::body_iterator bi = body->body_begin();
+         bi != body->body_end(); bi++) {
+      if (isa<SwitchCase>(*bi)) {
+
+        labelCount++;
+      }
+    }
+    if (labelCount < 2) {
+      pError(Context, ss,
+             "R16_6 Every switch statement shall have at least two "
+             "switch-clauses");
     }
 
     return true;

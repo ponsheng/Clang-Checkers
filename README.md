@@ -24,6 +24,8 @@ Implement checker based on Misra-C 2012
 
 * R16_5:  A default label shall appear as either the first or the last switch label of a switch statement
 
+* R16_6:  Every switch statement shall have at least two switch-clauses 
+
 # Reference
 
 https://github.com/rettichschnidi/clang-misracpp2008
