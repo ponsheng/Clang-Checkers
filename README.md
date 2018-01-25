@@ -26,6 +26,8 @@ Implement checker based on Misra-C 2012
 
 * R16_6:  Every switch statement shall have at least two switch-clauses 
 
+* R16_7:  A switch-expression shall not have essentially Boolean type
+
 # Reference
 
 https://github.com/rettichschnidi/clang-misracpp2008

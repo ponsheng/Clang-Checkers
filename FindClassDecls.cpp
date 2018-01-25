@@ -142,9 +142,11 @@ public:
     }
 
     std::vector<SwitchCase *> cases;
-    // Record most closely-enclosing cases
+    // Record most closely-enclosing cases i.e body of the switch
+    //
     for (CompoundStmt::body_iterator bi = body->body_begin();
          bi != body->body_end(); bi++) {
+      //(*bi)->dumpColor();
       if (isa<SwitchCase>(*bi)) {
         SwitchCase *sc = dyn_cast<SwitchCase>(*bi);
         cases.push_back(sc);
@@ -154,14 +156,13 @@ public:
           sc = dyn_cast<SwitchCase>(sc->getSubStmt());
           cases.push_back(sc);
         }
-        //(*bi)->dumpColor();
       }
     }
 
     for (const SwitchCase *sc = ss->getSwitchCaseList(); sc != nullptr;
          sc = sc->getNextSwitchCase()) {
-      // FIXME
-      sc->dumpColor();
+      //
+      // sc->dumpColor();
       if (std::find(cases.begin(), cases.end(), sc) == cases.end()) {
 
         pError(Context, sc,
@@ -196,6 +197,7 @@ public:
       SwitchCase *curSc = nullptr;
       SwitchCase *lastSc;
 
+      // FIXME -> cannot handle multiple { } warp
       for (CompoundStmt::body_iterator bi = body->body_begin();
            bi != body->body_end(); bi++) {
         if (isa<SwitchCase>(*bi)) {
@@ -221,10 +223,10 @@ public:
               labelCount++;
             } else {
               if (isa<DefaultStmt>(lastSc)) {
-                pError(
-                    Context, lastSc,
-                    "A default label shall appear as either the first or the "
-                    "last switch label");
+                pError(Context, lastSc,
+                       "R16_5: A default label shall appear as either the "
+                       "first or the "
+                       "last switch label");
               }
             }
           }
@@ -244,6 +246,23 @@ public:
         pError(Context, ss,
                "R16_6 Every switch statement shall have at least two "
                "switch-clauses");
+      }
+    }
+
+    /*******************************************************************************/
+    // R16_7 A switch-expression shall not have essentially Boolean type
+    // Copy from clang/lib/Sema/SemaStmt.cpp
+    {
+      Expr *cond = ss->getCond();
+      // cond->dumpColor();
+      QualType CondType = cond->getType();
+
+      // No need to check isTypeDependent() -> C has no template
+
+      if (cond->isKnownToHaveBooleanValue()) {
+        pError(Context, ss,
+               "R16_7 A switch-expression shall not have essentially Boolean "
+               "type");
       }
     }
 
