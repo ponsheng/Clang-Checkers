@@ -128,6 +128,7 @@ public:
   // Rule 16_2 A switch label shall only be used when the most closely-enclosing
   //   compound statement is the body of a switch statement
 
+  // TODO
   // Rule 16_3 An unconditional break statement shall terminate every
   // switch-clause
 
@@ -159,8 +160,10 @@ public:
 
     for (const SwitchCase *sc = ss->getSwitchCaseList(); sc != nullptr;
          sc = sc->getNextSwitchCase()) {
+      // FIXME
+      sc->dumpColor();
       if (std::find(cases.begin(), cases.end(), sc) == cases.end()) {
-        // sc->dumpColor();
+
         pError(Context, sc,
                "R16_2: Switch case is not used in most closely-enclosing of "
                "switch body");
@@ -186,6 +189,8 @@ public:
     // switch label of a switch statement
     //
     // We check if any SwitchCase is default except first and end
+    // FIXME if case is inside the compound statement
+    // You have to traverse AST by your self
     {
       int labelCount = 0;
       SwitchCase *curSc = nullptr;
@@ -229,18 +234,17 @@ public:
 
     /*******************************************************************************/
     // R16_6 Every switch statement shall have at least two switch-clauses
-    int labelCount = 0;
-    for (CompoundStmt::body_iterator bi = body->body_begin();
-         bi != body->body_end(); bi++) {
-      if (isa<SwitchCase>(*bi)) {
-
+    {
+      int labelCount = 0;
+      for (const SwitchCase *sc = ss->getSwitchCaseList(); sc != nullptr;
+           sc = sc->getNextSwitchCase()) {
         labelCount++;
       }
-    }
-    if (labelCount < 2) {
-      pError(Context, ss,
-             "R16_6 Every switch statement shall have at least two "
-             "switch-clauses");
+      if (labelCount < 2) {
+        pError(Context, ss,
+               "R16_6 Every switch statement shall have at least two "
+               "switch-clauses");
+      }
     }
 
     return true;
