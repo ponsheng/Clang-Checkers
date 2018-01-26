@@ -190,48 +190,20 @@ public:
     // switch label of a switch statement
     //
     // We check if any SwitchCase is default except first and end
-    // FIXME if case is inside the compound statement
-    // You have to traverse AST by your self
+    //
+    // We just count the label and store in member
+    // We let treaverse*() do the traverse AST work for us
+    // See VisitSwitchCase() do the other jobs
     {
-      int labelCount = 0;
-      SwitchCase *curSc = nullptr;
-      SwitchCase *lastSc;
+      // Reset class member in every switch
+      labelTotal = 0;
+      labelCount = 0;
 
-      // FIXME -> cannot handle multiple { } warp
-      for (CompoundStmt::body_iterator bi = body->body_begin();
-           bi != body->body_end(); bi++) {
-        if (isa<SwitchCase>(*bi)) {
-          lastSc = curSc;
-          curSc = dyn_cast<SwitchCase>(*bi);
-
-          /* check */
-          if (labelCount < 2) {
-            labelCount++;
-          } else {
-            if (isa<DefaultStmt>(lastSc)) {
-              pError(Context, lastSc,
-                     "R16_5: A default label shall appear as either the first "
-                     "or the last switch label");
-            }
-          }
-
-          while (isa<SwitchCase>(curSc->getSubStmt())) {
-            lastSc = curSc;
-            curSc = dyn_cast<SwitchCase>(curSc->getSubStmt());
-
-            if (labelCount < 2) {
-              labelCount++;
-            } else {
-              if (isa<DefaultStmt>(lastSc)) {
-                pError(Context, lastSc,
-                       "R16_5: A default label shall appear as either the "
-                       "first or the "
-                       "last switch label");
-              }
-            }
-          }
-        }
+      for (const SwitchCase *sc = ss->getSwitchCaseList(); sc != nullptr;
+           sc = sc->getNextSwitchCase()) {
+        labelTotal++;
       }
+
     } // end of R16_5
 
     /*******************************************************************************/
@@ -269,8 +241,22 @@ public:
     return true;
   } // end visitSwitch
 
+  bool VisitSwitchCase(SwitchCase *sc) {
+    labelCount++;
+    // Defautlt statment can only appear in first or last
+    if (labelCount != 1 && labelCount != labelTotal) {
+      if (isa<DefaultStmt>(sc)) {
+        pError(Context, sc,
+               "R16_5: A default label shall appear as either the first "
+               "or the last switch label");
+      }
+    }
+    return true;
+  }
+
 private:
   ASTContext *Context;
+  int labelCount, labelTotal;
 
   std::string srcLocToString(const SourceLocation start) {
     const clang::SourceManager &sm = Context->getSourceManager();
