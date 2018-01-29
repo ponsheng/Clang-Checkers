@@ -12,19 +12,11 @@
 
 using namespace clang;
 
-
 // Essential type category
 class EssentialT {
 
-  enum value {
-    BOOL,
-    CHAR,
-    SIGNED,
-    UNSIGNED,
-    ENUM,
-    FLOAT
-  };
-
+  QualType Type;
+  enum value { BOOL, CHAR, SIGNED, UNSIGNED, ENUM, FLOAT };
 };
 
 namespace R10 {
@@ -36,7 +28,6 @@ class FindNamedClassVisitor
 public:
   explicit FindNamedClassVisitor(ASTContext *Context) : Context(Context) {}
 
-
   bool VisitVarDecl(VarDecl *vd) {
     QualType Type = vd->getType();
     Type->dump();
@@ -45,9 +36,7 @@ public:
 
 private:
   ASTContext *Context;
-
 };
-
 
 class FindNamedClassConsumer : public clang::ASTConsumer {
 public:
@@ -85,7 +74,6 @@ int main(int argc, const char **argv) {
                           OptionsParser.getSourcePathList());
   return Tool.run(
       tooling::newFrontendActionFactory<R10::FindNamedClassAction>().get());
-
 
   return 0;
 }

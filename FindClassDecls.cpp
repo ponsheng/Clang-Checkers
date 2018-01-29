@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <vector>
 
-
 using namespace clang;
 
 namespace test {
