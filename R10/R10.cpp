@@ -10,13 +10,80 @@
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "llvm/Support/CommandLine.h"
 
+#include <string>
+
 using namespace clang;
+
+enum Category { BOOL, CHAR, SIGNED, UNSIGNED, ENUM, FLOAT, NONE };
+
+// TODO what if typedef
 
 // Essential type category
 class EssentialT {
 
-  QualType Type;
-  enum value { BOOL, CHAR, SIGNED, UNSIGNED, ENUM, FLOAT };
+public:
+  EssentialT(QualType T) : ClangType(T) {
+    value = map(ClangType);
+    llvm::outs() << EssentialT::getStr(value) << "\n\n";
+    ;
+  }
+
+  // FIXME make sure you know all type function
+  // Or know clang Types
+  // clang/include/clang/AST/BuiltinTypes.def
+  static enum Category map(QualType Ty) {
+
+    const Type *T = Ty.getTypePtr();
+    T->dump();
+    if (!isa<BuiltinType>(Ty)) {
+      if (T->isEnumeralType()) {
+        return ENUM;
+      }
+      // llvm::outs() << "Not a built-in type\n";
+      return NONE;
+    }
+
+    const BuiltinType *bt = dyn_cast<const BuiltinType>(T);
+
+    if (T->isBooleanType()) {
+      return BOOL;
+    } else if ((bt->getKind() == BuiltinType::Char_U ||
+                bt->getKind() == BuiltinType::Char_S)) {
+      // unsigned char is also this type
+      return CHAR;
+    } else if (T->isSignedIntegerType()) {
+      // signed char is also this type
+      return SIGNED;
+    } else if (T->isUnsignedIntegerType()) {
+      // A complete enum is also this type
+      return UNSIGNED;
+    } else if (T->isFloatingType()) {
+      return FLOAT;
+    } else {
+      return NONE;
+    }
+  }
+  static std::string getStr(enum Category Cat) {
+    switch (Cat) {
+#define CASE(CAT)                                                              \
+  case CAT:                                                                    \
+    return #CAT;
+      CASE(BOOL)
+      CASE(CHAR)
+      CASE(SIGNED)
+      CASE(UNSIGNED)
+      CASE(ENUM)
+      CASE(FLOAT)
+      CASE(NONE)
+#undef CASE
+    }
+    return "No such Category";
+  }
+
+private:
+  // QualType Type;
+  QualType ClangType;
+  enum Category value;
 };
 
 namespace R10 {
@@ -30,7 +97,8 @@ public:
 
   bool VisitVarDecl(VarDecl *vd) {
     QualType Type = vd->getType();
-    Type->dump();
+    EssentialT et(Type);
+    // Type->dump();
     return true;
   }
 
