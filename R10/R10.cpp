@@ -24,7 +24,7 @@ class EssentialT {
 public:
   EssentialT(QualType T) : ClangType(T) {
     value = map(ClangType);
-    llvm::outs() << EssentialT::getStr(value) << "\n\n";
+    //    llvm::outs() << EssentialT::getStr(value) << "\n\n";
     ;
   }
 
@@ -34,7 +34,7 @@ public:
   static enum Category map(QualType Ty) {
 
     const Type *T = Ty.getTypePtr();
-    T->dump();
+    //    T->dump();
     if (!isa<BuiltinType>(Ty)) {
       if (T->isEnumeralType()) {
         return ENUM;
@@ -80,10 +80,11 @@ public:
     return "No such Category";
   }
 
+  enum Category value;
+
 private:
   // QualType Type;
   QualType ClangType;
-  enum Category value;
 };
 
 namespace R10 {
@@ -95,10 +96,90 @@ class FindNamedClassVisitor
 public:
   explicit FindNamedClassVisitor(ASTContext *Context) : Context(Context) {}
 
-  bool VisitVarDecl(VarDecl *vd) {
-    QualType Type = vd->getType();
-    EssentialT et(Type);
-    // Type->dump();
+  /*  bool VisitVarDecl(VarDecl *vd) {
+      QualType Type = vd->getType();
+      EssentialT et(Type);
+      // Type->dump();
+      return true;
+    }*/
+
+  // R10_1 Operands shall not be of an inappropriate essential type
+
+  bool VisitArraySubscriptExpr(ArraySubscriptExpr *ase) {
+    // ase->dumpColor();
+    Expr *e = ase->getIdx()->IgnoreImplicit()->IgnoreParens();
+    // e->dumpColor();
+
+    if (DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e)) {
+      QualType T = dre->getType();
+      EssentialT et(T);
+      if (et.value == BOOL || et.value == CHAR || et.value == FLOAT) {
+        pError(
+            Context, e,
+            "R10_1: Operands of '[]' shall not be of an inappropriate essential type");
+      }
+    }
+    return true;
+  }
+
+  bool VisitUnaryOperator(UnaryOperator *uo) {
+    Expr *e = uo->getSubExpr()->IgnoreImplicit()->IgnoreParens();
+
+    if (uo->getOpcode() == UO_Plus) {
+      if (DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e)) {
+        QualType T = dre->getType();
+        EssentialT et(T);
+        if (et.value == BOOL || et.value == CHAR || et.value == ENUM) {
+          pError(Context, e,
+                 "R10_1: Operands of '+' shall not be of an inappropriate essential "
+                 "type");
+        }
+      }
+    }
+    if (uo->getOpcode() == UO_Minus) {
+      if (DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e)) {
+        QualType T = dre->getType();
+        EssentialT et(T);
+        if (et.value == BOOL || et.value == CHAR || et.value == ENUM ||
+            et.value == UNSIGNED) {
+          pError(Context, e,
+                 "R10_1: Operands of '-' shall not be of an inappropriate essential "
+                 "type");
+        }
+      }
+    }
+    return true;
+  }
+
+  bool VisitBinaryOperator(BinaryOperator* bo) {
+
+    Expr *lhs = bo->getLHS()->IgnoreImplicit()->IgnoreParens();
+    Expr *rhs = bo->getRHS()->IgnoreImplicit()->IgnoreParens();
+
+    Expr* e;
+    if (bo->getOpcode() == BO_Add) {
+      e = lhs;
+      if (DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e)) {
+        QualType T = dre->getType();
+        EssentialT et(T);
+        if (et.value == BOOL || et.value == ENUM) {
+          pError(Context, e,
+                 "R10_1: Operands of '+' shall not be of an inappropriate essential "
+                 "type");
+        }
+      }
+      e = rhs;
+      if (DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e)) {
+        QualType T = dre->getType();
+        EssentialT et(T);
+        if (et.value == BOOL || et.value == ENUM) {
+          pError(Context, e,
+                 "R10_1: Operands of '+' shall not be of an inappropriate essential "
+                 "type");
+        }
+      }
+
+    }
     return true;
   }
 
