@@ -29,7 +29,15 @@ template <class T> void pError(ASTContext *Context, T ASTnode, const char *msg) 
     // llvm::outs() << "Not macro\n";
   }
 
+  // Try to print out the line
+  int line_num = sm.getSpellingLineNumber(SpellingLoc);
 
+  FileID FID = sm.getFileID(SpellingLoc);
+  SourceLocation start = sm.translateLineCol(FID, line_num, 1);
+  SourceLocation end = sm.translateLineCol(FID, line_num+1, 1).getLocWithOffset(-1);
+  std::string line_data = std::string(sm.getCharacterData(start), sm.getCharacterData(end));
+
+  llvm::outs() << line_data  << "\n";
   llvm::outs() << "\n";
 }
 
