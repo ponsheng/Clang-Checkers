@@ -4,6 +4,7 @@ Implement checker based on Misra-C 2012
 
 ## Rules ongoing
 
+* R10_1
 
 ## Rules not include
 
@@ -24,9 +25,26 @@ Implement checker based on Misra-C 2012
 
 * R16_5:  A default label shall appear as either the first or the last switch label of a switch statement
 
-* R16_6:  Every switch statement shall have at least two switch-clauses 
+* R16_6:  Every switch statement shall have at least two switch-clauses
 
 * R16_7:  A switch-expression shall not have essentially Boolean type
+
+# Usage
+
+## Compilation
+
+1. Put this directory into clang source code.
+2. Add "add_subdirectory(Clang-Checkers)" to the CMakeLists.txt
+3. Compile clang with llvm following https://clang.llvm.org/get_started.html
+
+## Run
+
+The binary file will be located in build/bin
+
+To check a C file with header file
+```
+$ ./run source.c -- -I header.h
+```
 
 # Reference
 
