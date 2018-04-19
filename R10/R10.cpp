@@ -10,84 +10,15 @@
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "llvm/Support/CommandLine.h"
 
+#include <map>
 #include <string>
+
+#include "R10.hpp"
 
 using namespace clang;
 
-enum Category { BOOL, CHAR, SIGNED, UNSIGNED, ENUM, FLOAT, NONE };
 
-// TODO what if typedef
-
-// Essential type category
-class EssentialT {
-
-public:
-  EssentialT(QualType T) : ClangType(T) {
-    value = map(ClangType);
-    //    llvm::outs() << EssentialT::getStr(value) << "\n\n";
-    ;
-  }
-
-  // FIXME make sure you know all type function
-  // Or know clang Types
-  // clang/include/clang/AST/BuiltinTypes.def
-  static enum Category map(QualType Ty) {
-
-    const Type *T = Ty.getTypePtr();
-    //    T->dump();
-    if (!isa<BuiltinType>(Ty)) {
-      if (T->isEnumeralType()) {
-        return ENUM;
-      }
-      // llvm::outs() << "Not a built-in type\n";
-      return NONE;
-    }
-
-    const BuiltinType *bt = dyn_cast<const BuiltinType>(T);
-
-    if (T->isBooleanType()) {
-      return BOOL;
-    } else if ((bt->getKind() == BuiltinType::Char_U ||
-                bt->getKind() == BuiltinType::Char_S)) {
-      // unsigned char is also this type
-      return CHAR;
-    } else if (T->isSignedIntegerType()) {
-      // signed char is also this type
-      return SIGNED;
-    } else if (T->isUnsignedIntegerType()) {
-      // A complete enum is also this type
-      return UNSIGNED;
-    } else if (T->isFloatingType()) {
-      return FLOAT;
-    } else {
-      return NONE;
-    }
-  }
-  static std::string getStr(enum Category Cat) {
-    switch (Cat) {
-#define CASE(CAT)                                                              \
-  case CAT:                                                                    \
-    return #CAT;
-      CASE(BOOL)
-      CASE(CHAR)
-      CASE(SIGNED)
-      CASE(UNSIGNED)
-      CASE(ENUM)
-      CASE(FLOAT)
-      CASE(NONE)
-#undef CASE
-    }
-    return "No such Category";
-  }
-
-  enum Category value;
-
-private:
-  // QualType Type;
-  QualType ClangType;
-};
-
-namespace R10 {
+namespace misrac {
 
 #include "pError.h"
 
@@ -96,12 +27,13 @@ class FindNamedClassVisitor
 public:
   explicit FindNamedClassVisitor(ASTContext *Context) : Context(Context) {}
 
-  /*  bool VisitVarDecl(VarDecl *vd) {
-      QualType Type = vd->getType();
-      EssentialT et(Type);
-      // Type->dump();
-      return true;
-    }*/
+  /************************************************************************************
+ - clang/include/clang/AST/OperationKinds.def
+
+ To determine literal constant
+ - warn_shift_negative
+  - lib/Sema/SemaExpr.cp: 9067
+************************************************************************************/
 
   // R10_1 Operands shall not be of an inappropriate essential type
 
@@ -110,78 +42,100 @@ public:
     Expr *e = ase->getIdx()->IgnoreImplicit()->IgnoreParens();
     // e->dumpColor();
 
-    if (DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e)) {
-      QualType T = dre->getType();
-      EssentialT et(T);
-      if (et.value == BOOL || et.value == CHAR || et.value == FLOAT) {
-        pError(
-            Context, e,
-            "R10_1: Operands of '[]' shall not be of an inappropriate essential type");
-      }
-    }
+//    if (!op_table_lookup(e, "[]")) {
+      pError(Context, e,
+             "R10_1: Operands shall not be of an inappropriate essential type");
+//    }
     return true;
   }
 
   bool VisitUnaryOperator(UnaryOperator *uo) {
-    Expr *e = uo->getSubExpr()->IgnoreImplicit()->IgnoreParens();
-
+    //Expr *e = uo->getSubExpr()->IgnoreImplicit()->IgnoreParens();
+/*
     if (uo->getOpcode() == UO_Plus) {
       if (DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e)) {
         QualType T = dre->getType();
         EssentialT et(T);
         if (et.value == BOOL || et.value == CHAR || et.value == ENUM) {
           pError(Context, e,
-                 "R10_1: Operands of '+' shall not be of an inappropriate essential "
+                 "R10_1: Operands of '+' shall not be of an inappropriate "
+                 "essential "
                  "type");
         }
       }
-    }
+    }*/
+
     if (uo->getOpcode() == UO_Minus) {
+      //llvm::outs() << "MInus\n";
+    }
+    /*
       if (DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e)) {
         QualType T = dre->getType();
         EssentialT et(T);
         if (et.value == BOOL || et.value == CHAR || et.value == ENUM ||
             et.value == UNSIGNED) {
           pError(Context, e,
-                 "R10_1: Operands of '-' shall not be of an inappropriate essential "
-                 "type");
+                 "R10_1: Operands of '-' shall not be of an inappropriate
+    essential " "type");
         }
       }
-    }
+    }*/
     return true;
   }
+
+      // R_10_2  
+      // TODO The result of the operation has essentially
+      // character type.?
+      // What if chain operator 
+      // _char = signed_char + _char + signed_char + unsigned_char
+ 
 
   bool VisitBinaryOperator(BinaryOperator* bo) {
 
-    Expr *lhs = bo->getLHS()->IgnoreImplicit()->IgnoreParens();
-    Expr *rhs = bo->getRHS()->IgnoreImplicit()->IgnoreParens();
+      Expr *lhs = bo->getLHS()->IgnoreImplicit()->IgnoreParens();
+      Expr *rhs = bo->getRHS()->IgnoreImplicit()->IgnoreParens();
 
-    Expr* e;
-    if (bo->getOpcode() == BO_Add) {
-      e = lhs;
-      if (DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e)) {
-        QualType T = dre->getType();
-        EssentialT et(T);
-        if (et.value == BOOL || et.value == ENUM) {
-          pError(Context, e,
-                 "R10_1: Operands of '+' shall not be of an inappropriate essential "
-                 "type");
+      EssentialT lET(lhs);
+      EssentialT rET(rhs);
+
+      if ( bo->getOpcode() == BO_Add ) {
+        //lhs->dumpColor();
+        //lhs->dumpPretty(*Context);
+
+        if ( lET.value == ET_CHAR ) {
+          if ( rET.value != ET_SIGNED && rET.value != ET_UNSIGNED) {
+          pError(Context, bo,
+             "R10_2: Expressions of essentially character type shall not be used"
+             "inappropriately in addition and subtraction operations");
+          }
+        } else if ( rET.value == ET_CHAR ) {
+          if ( lET.value != ET_SIGNED && lET.value != ET_UNSIGNED) {
+          pError(Context, bo,
+             "R10_2: Expressions of essentially character type shall not be used"
+             "inappropriately in addition and subtraction operations");
+          }
+        }
+
+      }
+
+      if (bo->getOpcode() == BO_Sub ) {
+        if ( lET.value == ET_CHAR ) {
+          if ( rET.value != ET_SIGNED && rET.value != ET_UNSIGNED && rET.value != ET_CHAR ) {
+            pError(Context, bo,
+             "R10_2: Expressions of essentially character type shall not be used"
+             "inappropriately in addition and subtraction operations");
+          }
+        }
+        if (rET.value == ET_CHAR) {
+          if ( lET.value != ET_CHAR ) {
+            pError(Context, bo,
+             "R10_2: Expressions of essentially character type shall not be used"
+             "inappropriately in addition and subtraction operations");
+          }
         }
       }
-      e = rhs;
-      if (DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e)) {
-        QualType T = dre->getType();
-        EssentialT et(T);
-        if (et.value == BOOL || et.value == ENUM) {
-          pError(Context, e,
-                 "R10_1: Operands of '+' shall not be of an inappropriate essential "
-                 "type");
-        }
-      }
-
+      return true;
     }
-    return true;
-  }
 
 private:
   ASTContext *Context;
@@ -222,7 +176,7 @@ int main(int argc, const char **argv) {
   tooling::ClangTool Tool(OptionsParser.getCompilations(),
                           OptionsParser.getSourcePathList());
   return Tool.run(
-      tooling::newFrontendActionFactory<R10::FindNamedClassAction>().get());
+      tooling::newFrontendActionFactory<misrac::FindNamedClassAction>().get());
 
   return 0;
 }
