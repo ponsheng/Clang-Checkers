@@ -1,10 +1,22 @@
-#include "clang/AST/Type.h"
+#ifndef _R10_H_
+#define _R10_H_
 
+#include "clang/AST/Type.h"
 #include <string>
+
+//#define R_10_VERBOSE
 
 using namespace clang;
 
-enum ET { ET_NONE, ET_BOOL, ET_CHAR, ET_SIGNED, ET_UNSIGNED, ET_ENUM, ET_FLOAT};
+enum ET {
+  ET_NONE = 0,
+  ET_BOOL = 0x01,
+  ET_CHAR = 0x02,
+  ET_SIGNED = 0x04,
+  ET_UNSIGNED = 0x08,
+  ET_ENUM = 0x10,
+  ET_FLOAT = 0x20
+};
 
 // TODO what if typedef
 
@@ -12,67 +24,131 @@ enum ET { ET_NONE, ET_BOOL, ET_CHAR, ET_SIGNED, ET_UNSIGNED, ET_ENUM, ET_FLOAT};
 class EssentialT {
 
 public:
-  EssentialT(Expr* e) : value(ET_NONE) {
-    value = Expr_to_Essential(e);
-    //    llvm::outs() << EssentialT::getStr(value) << "\n\n";
-  }
-
   EssentialT() : value(ET_NONE) {}
 
-  enum ET setET(Expr* e)
-  {
-    return value = Expr_to_Essential(e);
-    //ClangType = T;
+  EssentialT(Expr *e) : value(ET_NONE) {
+    setET(e);
+  }
+  enum ET setET(Expr *e) {
+    value = Expr_to_Essential(e);
+    setType(e);
+
+#ifdef R_10_VERBOSE
+    e->dumpColor();
+    llvm::outs() << EssentialT::getStr(value) << "\n\n";
+#endif
+
+    return value;
   }
 
-  static enum ET Expr_to_Essential(Expr* e) {
-    if ( isa<DeclRefExpr>(e) ) {
-      return QualType_to_Essential( dyn_cast<DeclRefExpr>(e)->getType() );
+  // This should be called after value set
+  void setType(Expr* e) {
+    // FIXME Directly desugar?
+    type = e->getType().getTypePtr();
+
+    if ( value == ET_ENUM ) {
+
+      // For ElaboratedType enum
+      if (const ElaboratedType *et = dyn_cast<ElaboratedType>(type)) {
+        if (et->isSugared()) {
+          type = et->desugar().getTypePtr();
+        }
+
+      // For EnumConstantDecl  
+      } else if ( DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e) ) {
+
+        ValueDecl *nd = dre->getDecl();
+
+        if (isa<EnumConstantDecl>(nd)) {
+
+          if (EnumDecl *ed = dyn_cast<EnumDecl>(nd->getDeclContext())) {
+            type = ed->getTypeForDecl();
+          } else {
+            llvm::outs() << "Failed to get type of [EnumConstantDecl]\n";
+            nd->dumpColor();
+          }
+        }
+      }
     }
-    if ( isa<IntegerLiteral>(e)) {
-      return QualType_to_Essential( dyn_cast<IntegerLiteral>(e)->getType() ); 
+
+#ifdef R_10_VERBOSE
+    type->dump();
+#endif
+  }
+
+
+
+  enum ET Expr_to_Essential(Expr *e) {
+    if (isa<DeclRefExpr>(e)) {
+
+      DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e);
+      ValueDecl *nd = dre->getDecl();
+
+      // Deal with EnumConstantDecl type record
+      if (isa<EnumConstantDecl>(nd)) {
+
+#ifdef R_10_VERBOSE
+        llvm::outs() << "EnumConstantDecl\n";
+        //EnumConstantDecl *ecd = dyn_cast<EnumConstantDecl>(nd);
+        //ecd->dumpColor();
+#endif
+
+        return ET_ENUM;
+      }
+
+      return QualType_to_Essential(dre->getType());
+    }
+    if (isa<IntegerLiteral>(e)) {
+      return QualType_to_Essential(dyn_cast<IntegerLiteral>(e)->getType());
     }
     // FIXME ignore Ctyle or not
-    if ( isa<CStyleCastExpr>(e)) {
-      return QualType_to_Essential( dyn_cast<CStyleCastExpr>(e)->getType() ); 
+    if (isa<CStyleCastExpr>(e)) {
+      return QualType_to_Essential(dyn_cast<CStyleCastExpr>(e)->getType());
     }
-    if ( isa<CharacterLiteral>(e)) {
-      //llvm::outs() << "Char\n";
-      return  ET_CHAR;
-      //QualType_to_Essential( dyn_cast<CharacterLiteral>(e)->getType() ); 
+    if (isa<CharacterLiteral>(e)) {
+      // llvm::outs() << "Char\n";
+      return ET_CHAR;
+      // QualType_to_Essential( dyn_cast<CharacterLiteral>(e)->getType() );
     }
     return ET_NONE;
   }
 
-// We need functions to convert these CStyleCastExpr, IntegerLiteral, DeclRefExpr 
+  // We need functions to convert these CStyleCastExpr, IntegerLiteral,
+  // DeclRefExpr
 
   // FIXME make sure you know all type function
   // Or know clang Types
   // clang/include/clang/AST/BuiltinTypes.def
   static enum ET QualType_to_Essential(QualType qt) {
 
-   // QualType Ty = dre->getType();
+    // QualType Ty = dre->getType();
     const Type *T = qt.getTypePtr();
 
     // FIXME Deal with sugar here  uint8_t
     if (!isa<BuiltinType>(T)) {
-//      llvm::outs() << "Not Built-in type\n";
+
+#ifdef R_10_VERBOSE
+      llvm::outs() << "Not Built-in type\n";
+#endif
+
       if (T->isEnumeralType()) {
         return ET_ENUM;
       }
-        if ( isa<TypedefType>(T)) {
-          const TypedefType* tt = dyn_cast<TypedefType>(T);
-           //llvm::outs() << "TypedefType type" << (tt->isSugared() ? " Sugar" : "")  << "\n";
-            return QualType_to_Essential(tt->desugar());
-        }
+      if (isa<TypedefType>(T)) {
+        const TypedefType *tt = dyn_cast<TypedefType>(T);
+#ifdef R_10_VERBOSE
+        llvm::outs() << "TypedefType type" << (tt->isSugared() ? " Sugar" : "")
+                     << "\n";
+#endif
+        return QualType_to_Essential(tt->desugar());
+      }
 
-       T->dump();
-       llvm::outs() << "Unkonwn Non-built-in type\n";
-       return ET_NONE;
+      T->dump();
+      llvm::outs() << "Unkonwn Non-built-in type\n";
+      return ET_NONE;
     }
 
-
-    //llvm::outs() << "Built-in type\n";
+    // llvm::outs() << "Built-in type\n";
     const BuiltinType *bt = dyn_cast<const BuiltinType>(T);
 
     if (T->isBooleanType()) {
@@ -93,6 +169,7 @@ public:
       return ET_NONE;
     }
   }
+
   static std::string getStr(enum ET Cat) {
     switch (Cat) {
 #define CASE(CAT)                                                              \
@@ -109,9 +186,13 @@ public:
     }
     return "No such Category";
   }
+
   enum ET value;
+  //  QualType qtype;
+  const Type *type;
 
 private:
   // QualType Type;
-  QualType ClangType;
 };
+
+#endif

@@ -14,6 +14,7 @@
 #include <string>
 
 #include "R10.hpp"
+#include "R_10_4.h"
 
 using namespace clang;
 
@@ -143,14 +144,16 @@ private:
 
 class FindNamedClassConsumer : public clang::ASTConsumer {
 public:
-  explicit FindNamedClassConsumer(ASTContext *Context) : Visitor(Context) {}
+  explicit FindNamedClassConsumer(ASTContext *Context) : Visitor(Context) , Visitor_10_4(Context) {}
 
   virtual void HandleTranslationUnit(clang::ASTContext &Context) {
     Visitor.TraverseDecl(Context.getTranslationUnitDecl());
+    Visitor_10_4.TraverseDecl(Context.getTranslationUnitDecl());
   }
 
 private:
   FindNamedClassVisitor Visitor;
+  R_10_4 Visitor_10_4;
 };
 
 class FindNamedClassAction : public clang::ASTFrontendAction {
