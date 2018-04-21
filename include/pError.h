@@ -1,5 +1,30 @@
 
+#ifndef _MISRAC_PERROR_H_
+#define _MISRAC_PERROR_H_
+
+#include <string.h>
+
+
+template <class T> void __pError(ASTContext *Context, T ASTnode, std::string msg);
+template <class T> void pError(ASTContext *Context, T ASTnode, const char *msg);
+template <class T> void pError(ASTContext *Context, T ASTnode, std::string msg);
+
 template <class T> void pError(ASTContext *Context, T ASTnode, const char *msg) {
+  __pError(Context, ASTnode, std::string(msg));
+}
+
+template <class T> void pError(ASTContext *Context, T ASTnode, std::string msg) {
+  if ( const Expr* e = dyn_cast<Expr>(ASTnode) ) {
+    __pError(Context, e, std::string(msg));
+  } else {
+    llvm::outs() << "pError: Not a <Expr> object\n";
+  }
+}
+
+
+
+  
+template <class T> void __pError(ASTContext *Context, T ASTnode, std::string msg) {
   const SourceManager &sm = Context->getSourceManager();
   const SourceLocation LocStart = ASTnode->getLocStart();
   const SourceLocation SpellingLoc = sm.getSpellingLoc(ASTnode->getLocStart());
@@ -41,3 +66,4 @@ template <class T> void pError(ASTContext *Context, T ASTnode, const char *msg) 
   llvm::outs() << "\n";
 }
 
+#endif

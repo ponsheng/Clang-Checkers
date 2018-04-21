@@ -25,7 +25,8 @@ public:
     // Excluded op
     // excluding the shift, logical &&, logical || and comma operators.
     // We also remove C++ OP, Bitwise , assign
-    // TODO
+    // TODO In addition, the second and third operands of the ternary operator
+    //
     enum BinaryOperatorKind excluded_op[] = {BO_Comma, BO_LOr, BO_LAnd, BO_Shl, BO_Shr, BO_PtrMemD, BO_PtrMemI, BO_Assign};
     for ( auto kind : excluded_op ) {
         if (bo->getOpcode() == kind)

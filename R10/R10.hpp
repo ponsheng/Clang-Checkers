@@ -43,19 +43,27 @@ public:
 
   // This should be called after value set
   void setType(Expr* e) {
-    // FIXME Directly desugar?
+    //  Directly desugar? -> No We need info like type size
     type = e->getType().getTypePtr();
 
-    if ( value == ET_ENUM ) {
 
-      // For ElaboratedType enum
+    if ( value == ET_ENUM ) {
+      // For enum type def tyoe
+      while ( const TypedefType* tt = dyn_cast<TypedefType>(type) ) {
+          //if ( type->isSugared()) {
+            type = tt->desugar().getTypePtr();
+          //}
+      }
+
+      // For ElaboratedType enum, because we have to compare with EnumConstantDecl
       if (const ElaboratedType *et = dyn_cast<ElaboratedType>(type)) {
         if (et->isSugared()) {
           type = et->desugar().getTypePtr();
         }
-
+      }
+        
       // For EnumConstantDecl  
-      } else if ( DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e) ) {
+      if ( DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e) ) {
 
         ValueDecl *nd = dre->getDecl();
 
@@ -78,7 +86,7 @@ public:
 
 
 
-  enum ET Expr_to_Essential(Expr *e) {
+  static enum ET Expr_to_Essential(Expr *e) {
     if (isa<DeclRefExpr>(e)) {
 
       DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e);
@@ -101,7 +109,7 @@ public:
     if (isa<IntegerLiteral>(e)) {
       return QualType_to_Essential(dyn_cast<IntegerLiteral>(e)->getType());
     }
-    // FIXME ignore Ctyle or not
+    // Ignore Ctyle or not: No this include type wide info
     if (isa<CStyleCastExpr>(e)) {
       return QualType_to_Essential(dyn_cast<CStyleCastExpr>(e)->getType());
     }
@@ -109,6 +117,9 @@ public:
       // llvm::outs() << "Char\n";
       return ET_CHAR;
       // QualType_to_Essential( dyn_cast<CharacterLiteral>(e)->getType() );
+    }
+    if ( ImplicitCastExpr* ice = dyn_cast<ImplicitCastExpr>(e)) {
+      return Expr_to_Essential(ice->getSubExpr());
     }
     return ET_NONE;
   }
@@ -136,14 +147,9 @@ public:
       }
       if (isa<TypedefType>(T)) {
         const TypedefType *tt = dyn_cast<TypedefType>(T);
-#ifdef R_10_VERBOSE
-        llvm::outs() << "TypedefType type" << (tt->isSugared() ? " Sugar" : "")
-                     << "\n";
-#endif
         return QualType_to_Essential(tt->desugar());
       }
 
-      T->dump();
       llvm::outs() << "Unkonwn Non-built-in type\n";
       return ET_NONE;
     }
