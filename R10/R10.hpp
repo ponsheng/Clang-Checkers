@@ -26,9 +26,7 @@ class EssentialT {
 public:
   EssentialT() : value(ET_NONE) {}
 
-  EssentialT(Expr *e) : value(ET_NONE) {
-    setET(e);
-  }
+  EssentialT(Expr *e) : value(ET_NONE) { setET(e); }
   enum ET setET(Expr *e) {
     value = Expr_to_Essential(e);
     setType(e);
@@ -42,28 +40,28 @@ public:
   }
 
   // This should be called after value set
-  void setType(Expr* e) {
+  void setType(Expr *e) {
     //  Directly desugar? -> No We need info like type size
     type = e->getType().getTypePtr();
 
-
-    if ( value == ET_ENUM ) {
+    if (value == ET_ENUM) {
       // For enum type def tyoe
-      while ( const TypedefType* tt = dyn_cast<TypedefType>(type) ) {
-          //if ( type->isSugared()) {
-            type = tt->desugar().getTypePtr();
-          //}
+      while (const TypedefType *tt = dyn_cast<TypedefType>(type)) {
+        // if ( type->isSugared()) {
+        type = tt->desugar().getTypePtr();
+        //}
       }
 
-      // For ElaboratedType enum, because we have to compare with EnumConstantDecl
+      // For ElaboratedType enum, because we have to compare with
+      // EnumConstantDecl
       if (const ElaboratedType *et = dyn_cast<ElaboratedType>(type)) {
         if (et->isSugared()) {
           type = et->desugar().getTypePtr();
         }
       }
-        
-      // For EnumConstantDecl  
-      if ( DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e) ) {
+
+      // For EnumConstantDecl
+      if (DeclRefExpr *dre = dyn_cast<DeclRefExpr>(e)) {
 
         ValueDecl *nd = dre->getDecl();
 
@@ -84,8 +82,6 @@ public:
 #endif
   }
 
-
-
   static enum ET Expr_to_Essential(Expr *e) {
     if (isa<DeclRefExpr>(e)) {
 
@@ -93,12 +89,28 @@ public:
       ValueDecl *nd = dre->getDecl();
 
       // Deal with EnumConstantDecl type record
+      // TODO An enumeration constant from an anonymous enum
+      // has essentially signed type.
       if (isa<EnumConstantDecl>(nd)) {
 
 #ifdef R_10_VERBOSE
         llvm::outs() << "EnumConstantDecl\n";
-        //EnumConstantDecl *ecd = dyn_cast<EnumConstantDecl>(nd);
-        //ecd->dumpColor();
+        // EnumConstantDecl *ecd = dyn_cast<EnumConstantDecl>(nd);
+        // ecd->dumpColor();
+        if (EnumDecl *ed = dyn_cast<EnumDecl>(nd->getDeclContext())) {
+          const Type *t = ed->getTypeForDecl();
+          if (const TagType *tt = dyn_cast<TagType>(t)) {
+            // llvm::outs() << tt->isBeingDefined() <<
+            // tt->isCompleteDefinition()  << "\n";
+          }
+          if (TagDecl *td = dyn_cast<TagDecl>(ed)) {
+            llvm::outs() << td->isBeingDefined() << td->isCompleteDefinition()
+                         << "\n";
+            if (TypedefNameDecl *tnd = td->getTypedefNameForAnonDecl()) {
+              tnd->dump();
+            }
+          }
+        }
 #endif
 
         return ET_ENUM;
@@ -114,13 +126,18 @@ public:
       return QualType_to_Essential(dyn_cast<CStyleCastExpr>(e)->getType());
     }
     if (isa<CharacterLiteral>(e)) {
-      // llvm::outs() << "Char\n";
       return ET_CHAR;
-      // QualType_to_Essential( dyn_cast<CharacterLiteral>(e)->getType() );
     }
-    if ( ImplicitCastExpr* ice = dyn_cast<ImplicitCastExpr>(e)) {
+    if (isa<FloatingLiteral>(e)) {
+      return ET_FLOAT;
+    }
+    if (ImplicitCastExpr *ice = dyn_cast<ImplicitCastExpr>(e)) {
       return Expr_to_Essential(ice->getSubExpr());
     }
+    // Ignore check, direct getType
+
+    return QualType_to_Essential(e->getType());
+
     return ET_NONE;
   }
 
@@ -147,6 +164,9 @@ public:
       }
       if (isa<TypedefType>(T)) {
         const TypedefType *tt = dyn_cast<TypedefType>(T);
+
+        TypedefNameDecl *tnd = tt->getDecl();
+
         return QualType_to_Essential(tt->desugar());
       }
 
@@ -170,6 +190,7 @@ public:
       // A complete enum is also this type
       return ET_UNSIGNED;
     } else if (T->isFloatingType()) {
+      // TODO 0.0f does not go here
       return ET_FLOAT;
     } else {
       return ET_NONE;
